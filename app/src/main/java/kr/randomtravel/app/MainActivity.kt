@@ -373,10 +373,12 @@ class MainActivity : Activity() {
         val map = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            settings.setSupportZoom(true)
             webViewClient = WebViewClient()
             setBackgroundColor(Color.rgb(230, 237, 243))
         }
-        root.addView(map, LinearLayout.LayoutParams(-1, 0, 1f))
+        val mapHeight = (resources.displayMetrics.density * 310).toInt()
+        root.addView(map, LinearLayout.LayoutParams(-1, mapHeight))
         val external = Button(this).apply {
             text = "네이버 지도에서 자세히 보기"
             isEnabled = selected != null
@@ -388,7 +390,11 @@ class MainActivity : Activity() {
             }
         }
         root.addView(external)
-        setContentView(root)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(root)
+        }
+        setContentView(scroll)
         selected?.let { showMap(map, it.lat, it.lon, 11, it.province + " " + it.city) }
             ?: showMap(map, 36.5, 127.8, 7, "대한민국")
         draw.setOnClickListener {
