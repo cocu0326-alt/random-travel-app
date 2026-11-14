@@ -312,32 +312,34 @@ class MainActivity : Activity() {
         }
         root.addView(heading)
         val subtitle = TextView(this).apply {
-            text = "오늘은 어디로 떠날까요? 지역을 선택하고 룰렛을 돌려보세요."
+            text = "시·도를 먼저 뽑고, 해당 지역의 시·군·구를 뽑아보세요."
             textSize = 14f
             gravity = Gravity.CENTER
             setPadding(0, 10, 0, 20)
         }
         root.addView(subtitle)
-        val provinces = listOf("전국 전체") + destinations.map { it.province }.distinct()
-        val filter = Spinner(this)
-        filter.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, provinces)
-        root.addView(filter)
-        val cityFilter = Spinner(this)
-        root.addView(cityFilter)
-        fun refreshCities() {
-            val province = provinces[filter.selectedItemPosition]
-            val cities = listOf("시·군·구 전체") + destinations
-                .filter { province == "전국 전체" || it.province == province }
-                .map { if (province == "전국 전체") it.province + " " + it.city else it.city }.distinct().sorted()
-            cityFilter.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, cities)
+        val provinces = destinations.map { it.province }.distinct()
+        var chosenProvince: String? = null
+        val provinceLabel = TextView(this).apply {
+            text = "1단계 · 시·도 추첨"
+            textSize = 18f
         }
-        filter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                refreshCities()
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        root.addView(provinceLabel)
+        val provinceResult = TextView(this).apply {
+            text = "시·도를 먼저 뽑아주세요"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setPadding(0, 12, 0, 12)
         }
-        refreshCities()
+        root.addView(provinceResult)
+        val provinceDraw = Button(this).apply { text = "🎲 시·도 룰렛 돌리기" }
+        root.addView(provinceDraw)
+        val cityLabel = TextView(this).apply {
+            text = "2단계 · 시·군·구 추첨"
+            textSize = 18f
+            setPadding(0, 12, 0, 0)
+        }
+        root.addView(cityLabel)
         val noRepeat = CheckBox(this).apply {
             text = "중복 없이 뽑기 (모든 후보를 뽑으면 초기화)"
             isChecked = true
@@ -351,7 +353,10 @@ class MainActivity : Activity() {
             setPadding(0, 24, 0, 24)
         }
         root.addView(result)
-        val draw = Button(this).apply { text = "🎯 여행지 룰렛 돌리기" }
+        val draw = Button(this).apply {
+            text = "🎯 시·군·구 룰렛 돌리기"
+            isEnabled = false
+        }
         root.addView(draw)
         val historyLabel = TextView(this).apply {
             text = if (history.isEmpty()) "최근 추첨: 없음" else "최근 추첨: " + history.joinToString(" · ")
@@ -410,35 +415,57 @@ class MainActivity : Activity() {
         setContentView(scroll)
         selected?.let { showMap(map, it.lat, it.lon, 11, it.province + " " + it.city) }
             ?: showMap(map, 36.5, 127.8, 7, "대한민국")
+        provinceDraw.setOnClickListener {
+            if (rolling) return@setOnClickListener
+            rolling = true
+            provinceDraw.isEnabled = false
+            draw.isEnabled = false
+            external.isEnabled = false
+            chosenProvince = null
+            selected = null
+            var tick = 0
+            val runner = object : Runnable {
+                override fun run() {
+                    val province = provinces.random()
+                    provinceResult.text = province
+                    tick++
+                    if (tick < 18) {
+                        handler.postDelayed(this, (65 + tick * 12).toLong())
+                    } else {
+                        chosenProvince = province
+                        rolling = false
+                        provinceDraw.isEnabled = true
+                        draw.isEnabled = true
+                        result.text = "이제 " + province + "의 시·군·구를 뽑아주세요"
+                        showMap(map, 36.5, 127.8, 7, "대한민국")
+                    }
+                }
+            }
+            handler.post(runner)
+        }
         draw.setOnClickListener {
             if (rolling) return@setOnClickListener
-            val chosenProvince = provinces[filter.selectedItemPosition]
-            val chosenCity = cityFilter.selectedItem?.toString() ?: "시·군·구 전체"
-            val allCandidates = destinations.filter {
-                (chosenProvince == "전국 전체" || it.province == chosenProvince) &&
-                (chosenCity == "시·군·구 전체" || it.city == chosenCity || it.province + " " + it.city == chosenCity)
-            }
-            var candidates = if (noRepeat.isChecked) allCandidates.filter { (it.province + "/" + it.city) !in visited } else allCandidates
-            if (candidates.isEmpty() && allCandidates.isNotEmpty() && noRepeat.isChecked) {
+            val province = chosenProvince ?: return@setOnClickListener
+            val allCandidates = destinations.filter { it.province == province }
+            var candidates = if (noRepeat.isChecked) allCandidates.filter {
+                (it.province + "/" + it.city) !in visited
+            } else allCandidates
+            if (candidates.isEmpty() && noRepeat.isChecked) {
                 allCandidates.forEach { visited.remove(it.province + "/" + it.city) }
                 candidates = allCandidates
                 saveHistory()
-                Toast.makeText(this, "해당 지역 후보를 모두 뽑아 기록을 새로 시작합니다", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "해당 시·도의 모든 지역을 뽑아 기록을 초기화했습니다", Toast.LENGTH_SHORT).show()
             }
-            if (candidates.isEmpty()) {
-                Toast.makeText(this, "선택 가능한 여행지가 없습니다", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+            if (candidates.isEmpty()) return@setOnClickListener
             rolling = true
-            filter.isEnabled = false
-            cityFilter.isEnabled = false
+            provinceDraw.isEnabled = false
             draw.isEnabled = false
             external.isEnabled = false
             var tick = 0
             val runner = object : Runnable {
                 override fun run() {
                     val place = candidates.random()
-                    result.text = place.province + "\n" + place.city
+                    result.text = place.province + "\\n" + place.city
                     tick++
                     if (tick < 18) {
                         handler.postDelayed(this, (65 + tick * 12).toLong())
@@ -450,8 +477,7 @@ class MainActivity : Activity() {
                         saveHistory()
                         historyLabel.text = "최근 추첨: " + history.joinToString(" · ")
                         rolling = false
-                        filter.isEnabled = true
-                        cityFilter.isEnabled = true
+                        provinceDraw.isEnabled = true
                         draw.isEnabled = true
                         external.isEnabled = true
                         showMap(map, place.lat, place.lon, 11, place.province + " " + place.city)
