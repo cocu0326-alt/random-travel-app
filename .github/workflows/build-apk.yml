@@ -25,9 +25,9 @@ jobs:
           gradle-version: '8.9'
       - name: Install family app icon when uploaded
         run: |
-          if [ -f app/src/main/icon-source.png ]; then
+          if [ -f app/src/main/icon-source.png ] || [ -f app/src/main/file_0000000045108209bd69570a702918c5.png ]; then
             mkdir -p app/src/main/res/drawable-nodpi
-            cp app/src/main/icon-source.png app/src/main/res/drawable-nodpi/app_icon.png
+            cp "$(test -f app/src/main/icon-source.png && echo app/src/main/icon-source.png || echo app/src/main/file_0000000045108209bd69570a702918c5.png)" app/src/main/res/drawable-nodpi/app_icon.png
             sed -i 's|@android:drawable/ic_menu_compass|@drawable/app_icon|' app/src/main/AndroidManifest.xml
           fi
       - name: Build debug APK
