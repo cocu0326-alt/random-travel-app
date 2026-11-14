@@ -287,6 +287,15 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private var selected: Destination? = null
     private var rolling = false
+    private var homeScreen: View? = null
+    private var onTravelPage = false
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (onTravelPage && homeScreen != null) {
+            onTravelPage = false
+            setContentView(homeScreen)
+        } else super.onBackPressed()
+    }
     private val visited = mutableSetOf<String>()
     private val history = mutableListOf<String>()
     private val travelCounts = mutableMapOf<String, Int>()
@@ -525,23 +534,90 @@ class MainActivity : Activity() {
             }
         }
         root.addView(external)
-        val scroll = ScrollView(this).apply {
+        // The home screen is deliberately a single viewport, with the map taking
+        // the flexible remaining height. Travel history lives on a separate page.
+        val travelPage = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(background)
-            isFillViewport = true
-            addView(root)
+            setPadding(16, 8, 16, 8)
         }
-        // Android 15+ can draw behind the system bars; reserve their insets.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            scroll.setOnApplyWindowInsetsListener { view, insets ->
-                val bars = insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-                insets
+        val back = Button(this).apply {
+            text = "← 룰렛으로 돌아가기"
+            setOnClickListener {
+                onTravelPage = false
+                setContentView(root)
             }
+        }
+        travelPage.addView(back)
+        travelPage.addView(TextView(this).apply {
+            text = "★ 나의 여행 기록"
+            textSize = 23f
+            gravity = Gravity.CENTER
+            setPadding(0, 8, 0, 12)
+        })
+        // Move visit controls to the dedicated travel page.
+        listOf(stars, travelSummary, confirmVisit, travelLog, travelMapButton).forEach {
+            root.removeView(it)
+            travelPage.addView(it)
+        }
+        val travelScroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(travelPage)
+        }
+        val travelNav = Button(this).apply {
+            text = "★ 여행 완료 기록 / 금색 별 보기"
+            setOnClickListener {
+                if (rolling) return@setOnClickListener
+                onTravelPage = true
+                setContentView(travelScroll)
+            }
+        }
+        // Compact ordering: map → province → city, all visible without scrolling.
+        root.removeAllViews()
+        root.setPadding(14, 6, 14, 6)
+        heading.textSize = 24f
+        subtitle.textSize = 11f
+        subtitle.setPadding(0, 0, 0, 3)
+        provinceLabel.textSize = 15f
+        provinceResult.textSize = 18f
+        provinceResult.setPadding(0, 2, 0, 2)
+        cityLabel.textSize = 15f
+        cityLabel.setPadding(0, 2, 0, 0)
+        result.textSize = 20f
+        result.setPadding(0, 2, 0, 2)
+        noRepeat.textSize = 12f
+        root.addView(heading)
+        root.addView(map, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(provinceLabel)
+        root.addView(provinceResult)
+        root.addView(provinceDraw)
+        root.addView(cityLabel)
+        root.addView(result)
+        root.addView(draw)
+        root.addView(noRepeat)
+        root.addView(external)
+        root.addView(travelNav)
+        // The history/reset controls remain available on the travel page.
+        travelPage.addView(historyLabel)
+        travelPage.addView(reset)
+        val insetListener = View.OnApplyWindowInsetsListener { view, insets ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val bars = insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                view.setPadding(bars.left + 14, bars.top + 6, bars.right + 14, bars.bottom + 6)
+            }
+            insets
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            root.setOnApplyWindowInsetsListener(insetListener)
+            travelScroll.setOnApplyWindowInsetsListener(insetListener)
         } else {
             @Suppress("DEPRECATION")
-            scroll.fitsSystemWindows = true
+            root.fitsSystemWindows = true
+            @Suppress("DEPRECATION")
+            travelScroll.fitsSystemWindows = true
         }
-        setContentView(scroll)
+        homeScreen = root
+        setContentView(root)
         selected?.let { showMap(map, it.lat, it.lon, 11, it.province + " " + it.city) }
             ?: showProvinceRouletteMap(map, emptyList())
         provinceDraw.setOnClickListener {
