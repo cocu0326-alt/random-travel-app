@@ -1,6 +1,7 @@
 package kr.randomtravel.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Build
 import android.view.WindowInsets
@@ -288,11 +289,19 @@ class MainActivity : Activity() {
     private var rolling = false
     private val visited = mutableSetOf<String>()
     private val history = mutableListOf<String>()
+    private val travelCounts = mutableMapOf<String, Int>()
+    private fun destinationKey(place: Destination) = place.province + "/" + place.city
+    private fun starLabel(place: Destination?): String {
+        val count = place?.let { travelCounts[destinationKey(it)] } ?: 0
+        return if (count == 0) "아직 방문 기록이 없습니다"
+            else "★ " + count + "개 · 다녀온 여행 " + count + "회"
+    }
     private fun saveHistory() {
         getSharedPreferences("travel_history", Context.MODE_PRIVATE).edit()
             .putString("visited", visited.joinToString("|"))
             .putString("recent", history.joinToString("|"))
             .putString("selected", selected?.let { it.province + "/" + it.city } ?: "")
+            .putString("travel_counts", travelCounts.entries.joinToString("|") { it.key + "=" + it.value })
             .apply()
     }
 
@@ -301,6 +310,13 @@ class MainActivity : Activity() {
         val preferences = getSharedPreferences("travel_history", Context.MODE_PRIVATE)
         preferences.getString("visited", "")?.split("|")?.filter { it.isNotBlank() }?.let { visited.addAll(it) }
         preferences.getString("recent", "")?.split("|")?.filter { it.isNotBlank() }?.let { history.addAll(it.take(5)) }
+        preferences.getString("travel_counts", "")?.split("|")?.forEach { entry ->
+            val separator = entry.lastIndexOf('=')
+            if (separator > 0) {
+                val count = entry.substring(separator + 1).toIntOrNull()
+                if (count != null && count > 0) travelCounts[entry.substring(0, separator)] = count
+            }
+        }
         selected = destinations.firstOrNull { it.province + "/" + it.city == preferences.getString("selected", "") }
         val background = Color.rgb(235, 243, 245)
         window.statusBarColor = Color.rgb(220, 234, 238)
@@ -370,6 +386,35 @@ class MainActivity : Activity() {
             setPadding(0, 24, 0, 24)
         }
         root.addView(result)
+        val stars = TextView(this).apply {
+            text = starLabel(selected)
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(Color.rgb(190, 140, 25))
+            setPadding(0, 0, 0, 10)
+        }
+        root.addView(stars)
+        val confirmVisit = Button(this).apply {
+            text = "★ 여행 다녀왔어요 (+1)"
+            isEnabled = selected != null
+            setOnClickListener {
+                if (rolling) return@setOnClickListener
+                val place = selected ?: return@setOnClickListener
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("여행 완료 기록")
+                    .setMessage(place.province + " " + place.city + " 여행을 다녀오셨나요? 금색 별 1개가 추가됩니다.")
+                    .setNegativeButton("취소", null)
+                    .setPositiveButton("별 추가") { _, _ ->
+                        val key = destinationKey(place)
+                        travelCounts[key] = (travelCounts[key] ?: 0) + 1
+                        saveHistory()
+                        stars.text = starLabel(selected)
+                        Toast.makeText(this@MainActivity, "여행 완료! 금색 별이 추가되었습니다", Toast.LENGTH_SHORT).show()
+                    }
+                    .show()
+            }
+        }
+        root.addView(confirmVisit)
         val draw = Button(this).apply {
             text = "🎯 시·군·구 룰렛 돌리기"
             isEnabled = chosenProvince != null
@@ -439,6 +484,8 @@ class MainActivity : Activity() {
             provinceDraw.isEnabled = false
             draw.isEnabled = false
             external.isEnabled = false
+            confirmVisit.isEnabled = false
+            stars.text = starLabel(null)
             chosenProvince = null
             selected = null
             result.text = "시·도 추첨이 끝나면 2단계를 진행하세요"
@@ -502,6 +549,8 @@ class MainActivity : Activity() {
                         provinceDraw.isEnabled = true
                         draw.isEnabled = true
                         external.isEnabled = true
+                        confirmVisit.isEnabled = true
+                        stars.text = starLabel(place)
                         showMap(map, place.lat, place.lon, 11, place.province + " " + place.city)
                     }
                 }
