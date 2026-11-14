@@ -418,7 +418,7 @@ class MainActivity : Activity() {
         }
         setContentView(scroll)
         selected?.let { showMap(map, it.lat, it.lon, 11, it.province + " " + it.city) }
-            ?: showMap(map, 36.5, 127.8, 7, "대한민국")
+            ?: showProvinceRouletteMap(map, emptyList())
         provinceDraw.setOnClickListener {
             if (rolling) return@setOnClickListener
             rolling = true
@@ -512,6 +512,7 @@ class MainActivity : Activity() {
               {attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(map);
             var status=document.getElementById('status');
             var sequence=[$names];
+            if(!sequence.length)status.textContent='전국 시·도 경계 표시 중...';
             window.highlightProvince=function(name,isFinal){
               window.pendingProvince={name:name,final:isFinal};
               status.textContent=(isFinal?'🎉 당첨: ':'🎲 추첨 중: ')+name;
@@ -544,6 +545,7 @@ class MainActivity : Activity() {
                   previous=name;
                 };
                 if(window.pendingProvince)window.highlightProvince(window.pendingProvince.name,window.pendingProvince.final);
+                else status.textContent='시·도 경계 준비 완료 · 룰렛을 돌려보세요';
               }).catch(function(){status.textContent='경계 연결 실패 · 추첨은 계속됩니다';});
             </script></body></html>
         """.trimIndent()
