@@ -2,6 +2,8 @@ package kr.randomtravel.app
 
 import android.app.Activity
 import android.os.Bundle
+import android.os.Build
+import android.view.WindowInsets
 import android.content.Intent
 import android.content.Context
 import android.net.Uri
@@ -393,6 +395,17 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             addView(root)
+        }
+        // Android 15+ can draw behind the system bars; reserve their insets.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            scroll.setOnApplyWindowInsetsListener { view, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                insets
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            scroll.fitsSystemWindows = true
         }
         setContentView(scroll)
         selected?.let { showMap(map, it.lat, it.lon, 11, it.province + " " + it.city) }
