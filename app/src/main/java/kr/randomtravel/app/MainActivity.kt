@@ -427,10 +427,12 @@ class MainActivity : Activity() {
             external.isEnabled = false
             chosenProvince = null
             selected = null
+            val sequence = List(18) { provinces.random() }
+            showProvinceRouletteMap(map, sequence)
             var tick = 0
             val runner = object : Runnable {
                 override fun run() {
-                    val province = provinces.random()
+                    val province = sequence[tick]
                     provinceResult.text = province
                     tick++
                     if (tick < 18) {
@@ -441,7 +443,7 @@ class MainActivity : Activity() {
                         provinceDraw.isEnabled = true
                         draw.isEnabled = true
                         result.text = "이제 " + province + "의 시·군·구를 뽑아주세요"
-                        showMap(map, 36.5, 127.8, 7, "대한민국")
+                        // Keep the winning province highlighted on the map.
                     }
                 }
             }
@@ -490,6 +492,59 @@ class MainActivity : Activity() {
             }
             handler.post(runner)
         }
+    }
+
+    private fun showProvinceRouletteMap(webView: WebView, sequence: List<String>) {
+        val names = sequence.joinToString(",") { "'" + it.replace("'", "") + "'" }
+        val html = """
+            <!doctype html><html lang="ko"><head>
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+            <style>html,body,#map{margin:0;width:100%;height:100%;background:#e8eef3}
+            #status{position:absolute;z-index:1000;left:8px;bottom:8px;background:white;padding:7px 12px;border-radius:7px;font:14px sans-serif;color:#234;box-shadow:0 1px 5px #999}</style>
+            </head><body><div id="map"></div><div id="status">시·도 경계 불러오는 중...</div>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script>
+            var map=L.map('map').setView([36.35,127.8],7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              {attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(map);
+            var status=document.getElementById('status');
+            var sequence=[$names];
+            var aliases={'전라북도':'전북특별자치도'};
+            fetch('https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson')
+              .then(function(r){if(!r.ok)throw new Error('GeoJSON');return r.json()})
+              .then(function(data){
+                var groups={};
+                data.features.forEach(function(f){
+                  var name=aliases[f.properties.SIDO_NM]||f.properties.SIDO_NM;
+                  (groups[name]||(groups[name]=[])).push(f);
+                });
+                var layers={};
+                Object.keys(groups).forEach(function(name){
+                  layers[name]=L.geoJSON({type:'FeatureCollection',features:groups[name]},
+                    {style:{color:'#667788',weight:1,fillColor:'#dce8f2',fillOpacity:0.25}})
+                    .addTo(map);
+                });
+                var i=0,previous=null;
+                function advance(){
+                  if(previous&&layers[previous])layers[previous].setStyle(
+                    {color:'#667788',weight:1,fillColor:'#dce8f2',fillOpacity:0.25});
+                  var name=sequence[i];
+                  if(layers[name]){
+                    layers[name].setStyle({color:'#e05a22',weight:3,fillColor:'#ffb13b',fillOpacity:0.7});
+                    layers[name].bringToFront();
+                  }
+                  status.textContent=(i===sequence.length-1?'🎉 당첨: ':'🎲 추첨 중: ')+name;
+                  previous=name;
+                  i++;
+                  if(i<sequence.length)setTimeout(advance,65+i*12);
+                  else if(layers[name])map.fitBounds(layers[name].getBounds(),{padding:[16,16],maxZoom:9});
+                }
+                advance();
+              }).catch(function(){status.textContent='경계 연결 실패 · 추첨은 계속됩니다';});
+            </script></body></html>
+        """.trimIndent()
+        webView.loadDataWithBaseURL("https://unpkg.com/", html, "text/html", "UTF-8", null)
     }
 
     private fun showMap(webView: WebView, lat: Double, lon: Double, zoom: Int, title: String) {
