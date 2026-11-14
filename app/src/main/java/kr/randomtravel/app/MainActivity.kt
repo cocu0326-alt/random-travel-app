@@ -631,7 +631,7 @@ class MainActivity : Activity() {
             if (count <= 0) null else {
                 val safeName = (place.province + " " + place.city)
                     .replace("\\", "\\\\").replace("'", "\\'").replace("<", "").replace(">", "")
-                "[$" + "{place.lat},$" + "{place.lon},'$" + "{safeName}',$" + "{count}]"
+                "[${place.lat},${place.lon},'${safeName}',${count}]"
             }
         }.joinToString(",")
         val html = """
