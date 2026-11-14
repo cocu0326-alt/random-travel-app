@@ -30,6 +30,10 @@ jobs:
             cp "$(test -f app/src/main/icon-source.png && echo app/src/main/icon-source.png || echo app/src/main/file_0000000045108209bd69570a702918c5.png)" app/src/main/res/drawable-nodpi/app_icon.png
             sed -i 's|@android:drawable/ic_menu_compass|@drawable/app_icon|' app/src/main/AndroidManifest.xml
           fi
+      - name: Bundle offline Korea map
+        run: |
+          mkdir -p app/src/main/assets
+          cp "app/src/main/java/전국_지리-01.jpg" app/src/main/assets/korea-map.jpg
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Verify generated APK
