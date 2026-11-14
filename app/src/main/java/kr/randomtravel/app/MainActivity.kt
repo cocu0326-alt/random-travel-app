@@ -286,6 +286,7 @@ class MainActivity : Activity() {
         getSharedPreferences("travel_history", Context.MODE_PRIVATE).edit()
             .putString("visited", visited.joinToString("|"))
             .putString("recent", history.joinToString("|"))
+            .putString("selected", selected?.let { it.province + "/" + it.city } ?: "")
             .apply()
     }
 
@@ -294,6 +295,7 @@ class MainActivity : Activity() {
         val preferences = getSharedPreferences("travel_history", Context.MODE_PRIVATE)
         preferences.getString("visited", "")?.split("|")?.filter { it.isNotBlank() }?.let { visited.addAll(it) }
         preferences.getString("recent", "")?.split("|")?.filter { it.isNotBlank() }?.let { history.addAll(it.take(5)) }
+        selected = destinations.firstOrNull { it.province + "/" + it.city == preferences.getString("selected", "") }
         val background = Color.rgb(245, 249, 253)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -340,7 +342,7 @@ class MainActivity : Activity() {
         }
         root.addView(noRepeat)
         val result = TextView(this).apply {
-            text = "여행지를 뽑아보세요!"
+            text = selected?.let { it.province + "\n" + it.city } ?: "여행지를 뽑아보세요!"
             textSize = 25f
             gravity = Gravity.CENTER
             setTextColor(Color.rgb(13, 97, 150))
@@ -377,7 +379,7 @@ class MainActivity : Activity() {
         root.addView(map, LinearLayout.LayoutParams(-1, 0, 1f))
         val external = Button(this).apply {
             text = "네이버 지도에서 자세히 보기"
-            isEnabled = false
+            isEnabled = selected != null
             setOnClickListener {
                 selected?.let {
                     val q = it.province + " " + it.city
@@ -387,7 +389,8 @@ class MainActivity : Activity() {
         }
         root.addView(external)
         setContentView(root)
-        showMap(map, 36.5, 127.8, 7, "대한민국")
+        selected?.let { showMap(map, it.lat, it.lon, 11, it.province + " " + it.city) }
+            ?: showMap(map, 36.5, 127.8, 7, "대한민국")
         draw.setOnClickListener {
             if (rolling) return@setOnClickListener
             val chosenProvince = provinces[filter.selectedItemPosition]
