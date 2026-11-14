@@ -736,59 +736,32 @@ class MainActivity : Activity() {
     }
 
     private fun showProvinceRouletteMap(webView: WebView, sequence: List<String>) {
-        val names = sequence.joinToString(",") { "'" + it.replace("'", "") + "'" }
+        // Static province map during both roulette stages. Real tiles load only on final result.
         val html = """
             <!doctype html><html lang="ko"><head>
             <meta name="viewport" content="width=device-width,initial-scale=1">
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-            <style>html,body,#map{margin:0;width:100%;height:100%;background:#e8eef3}
-            #status{position:absolute;z-index:1000;left:8px;bottom:8px;background:white;padding:7px 12px;border-radius:7px;font:14px sans-serif;color:#234;box-shadow:0 1px 5px #999}</style>
-            </head><body><div id="map"></div><div id="status">시·도 경계 불러오는 중...</div>
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+              html,body{margin:0;width:100%;height:100%;background:#eef3f5;overflow:hidden}
+              #map{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+              img{width:100%;height:100%;object-fit:contain}
+              #status{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
+                max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                background:rgba(255,255,255,.95);color:#264c60;border:1px solid #a9c6cf;
+                border-radius:18px;padding:7px 14px;font:600 15px sans-serif;
+                box-shadow:0 2px 8px #7893a044}
+            </style></head><body>
+            <div id="map">
+              <img src="https://raw.githubusercontent.com/cocu0326-alt/random-travel-app/main/app/src/main/java/%EC%A0%84%EA%B5%AD_%EC%A7%80%EB%A6%AC-01.jpg" alt="전국 시·도 지도">
+              <div id="status">🎲 시·도 룰렛을 돌려보세요</div>
+            </div>
             <script>
-            var map=L.map('map').setView([36.35,127.8],7);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              {attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(map);
-            var status=document.getElementById('status');
-            var sequence=[$names];
-            if(!sequence.length)status.textContent='전국 시·도 경계 표시 중...';
-            window.highlightProvince=function(name,isFinal){
-              window.pendingProvince={name:name,final:isFinal};
-              status.textContent=(isFinal?'🎉 당첨: ':'🎲 추첨 중: ')+name;
-            };
-            var aliases={'전라북도':'전북특별자치도'};
-            fetch('https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson')
-              .then(function(r){if(!r.ok)throw new Error('GeoJSON');return r.json()})
-              .then(function(data){
-                var groups={};
-                data.features.forEach(function(f){
-                  var name=aliases[f.properties.SIDO_NM]||f.properties.SIDO_NM;
-                  (groups[name]||(groups[name]=[])).push(f);
-                });
-                var layers={};
-                Object.keys(groups).forEach(function(name){
-                  layers[name]=L.geoJSON({type:'FeatureCollection',features:groups[name]},
-                    {style:{color:'#667788',weight:1,fillColor:'#dce8f2',fillOpacity:0.25}})
-                    .addTo(map);
-                });
-                var previous=null;
-                window.highlightProvince=function(name,isFinal){
-                  if(previous&&layers[previous])layers[previous].setStyle(
-                    {color:'#667788',weight:1,fillColor:'#dce8f2',fillOpacity:0.25});
-                  if(layers[name]){
-                    layers[name].setStyle({color:'#e05a22',weight:3,fillColor:'#ffb13b',fillOpacity:0.7});
-                    layers[name].bringToFront();
-                    if(isFinal)map.fitBounds(layers[name].getBounds(),{padding:[16,16],maxZoom:9});
-                  }
-                  status.textContent=(isFinal?'🎉 당첨: ':'🎲 추첨 중: ')+name;
-                  previous=name;
-                };
-                if(window.pendingProvince)window.highlightProvince(window.pendingProvince.name,window.pendingProvince.final);
-                else status.textContent='시·도 경계 준비 완료 · 룰렛을 돌려보세요';
-              }).catch(function(){status.textContent='경계 연결 실패 · 추첨은 계속됩니다';});
+              window.highlightProvince=function(name,isFinal){
+                document.getElementById('status').textContent=
+                  (isFinal?'🎉 선택된 시·도: ':'🎲 추첨 중: ')+name;
+              };
             </script></body></html>
         """.trimIndent()
-        webView.loadDataWithBaseURL("https://unpkg.com/", html, "text/html", "UTF-8", null)
+        webView.loadDataWithBaseURL("https://raw.githubusercontent.com/", html, "text/html", "UTF-8", null)
     }
 
     private fun showMap(webView: WebView, lat: Double, lon: Double, zoom: Int, title: String) {
