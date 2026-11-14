@@ -677,6 +677,7 @@ class MainActivity : Activity() {
                 override fun run() {
                     val place = candidates.random()
                     result.text = place.province + "\n" + place.city
+                    map.evaluateJavascript("window.highlightCity && window.highlightCity(" + place.lat + "," + place.lon + ",\u0027" + place.city + "\u0027," + (tick == 17) + ");", null)
                     tick++
                     if (tick < 18) {
                         handler.postDelayed(this, (65 + tick * 12).toLong())
@@ -736,7 +737,6 @@ class MainActivity : Activity() {
     }
 
     private fun showProvinceRouletteMap(webView: WebView, sequence: List<String>) {
-        // Static province map during both roulette stages. Real tiles load only on final result.
         val html = """
             <!doctype html><html lang="ko"><head>
             <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -744,20 +744,52 @@ class MainActivity : Activity() {
               html,body{margin:0;width:100%;height:100%;background:#eef3f5;overflow:hidden}
               #map{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
               img{width:100%;height:100%;object-fit:contain}
+              #marker{position:absolute;display:none;transform:translate(-50%,-100%);font-size:29px;
+                filter:drop-shadow(0 2px 4px #183e63);z-index:2;pointer-events:none}
+              #marker.flash{animation:blink .32s ease-in-out infinite alternate}
+              @keyframes blink{from{opacity:.22;transform:translate(-50%,-100%) scale(.72)}
+                to{opacity:1;transform:translate(-50%,-100%) scale(1.25)}}
               #status{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
                 max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                 background:rgba(255,255,255,.95);color:#264c60;border:1px solid #a9c6cf;
                 border-radius:18px;padding:7px 14px;font:600 15px sans-serif;
-                box-shadow:0 2px 8px #7893a044}
+                box-shadow:0 2px 8px #7893a044;z-index:3}
+              #status.flash{background:#ffed92;border-color:#f3a900}
             </style></head><body>
             <div id="map">
               <img src="file:///android_asset/korea-map.jpg" alt="전국 시·도 지도">
+              <div id="marker">📍</div>
               <div id="status">🎲 시·도 룰렛을 돌려보세요</div>
             </div>
             <script>
-              window.highlightProvince=function(name,isFinal){
-                document.getElementById('status').textContent=
-                  (isFinal?'🎉 선택된 시·도: ':'🎲 추첨 중: ')+name;
+              // Approximate visual positions on the illustration, not administrative boundaries.
+              const provincePositions={
+                '서울특별시':[49,30],'인천광역시':[39,33],'경기도':[49,37],
+                '강원특별자치도':[68,29],'강원도':[68,29],
+                '충청북도':[59,48],'충청남도':[43,52],'대전광역시':[53,55],
+                '세종특별자치시':[52,48],'전북특별자치도':[49,67],'전라북도':[49,67],
+                '광주광역시':[43,78],'전라남도':[44,82],
+                '경상북도':[73,57],'대구광역시':[70,69],
+                '울산광역시':[83,74],'부산광역시':[80,81],
+                '경상남도':[66,78],'제주특별자치도':[34,94]
+              };
+              function locate(x,y,final){
+                const marker=document.getElementById('marker');
+                marker.style.left=x+'%';marker.style.top=y+'%';
+                marker.style.display='block';marker.className=final?'':'flash';
+                document.getElementById('status').className=final?'':'flash';
+              }
+              window.highlightProvince=function(name,final){
+                const p=provincePositions[name]||[50,50];
+                locate(p[0],p[1],final);
+                document.getElementById('status').textContent=(final?'🎉 선택된 시·도: ':'🎲 추첨 중: ')+name;
+              };
+              window.highlightCity=function(lat,lon,name,final){
+                // Representative point projected approximately onto the static artwork.
+                const x=Math.max(18,Math.min(89,38+(lon-125.7)*19));
+                const y=Math.max(14,Math.min(92,89-(lat-33.1)*15));
+                locate(x,y,final);
+                document.getElementById('status').textContent=(final?'🎉 선택: ':'🎲 시·군·구 추첨 중: ')+name;
               };
             </script></body></html>
         """.trimIndent()
