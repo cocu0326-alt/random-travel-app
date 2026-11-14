@@ -14,6 +14,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
+import android.widget.AdapterView
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -84,6 +85,22 @@ class MainActivity : Activity() {
         val filter = Spinner(this)
         filter.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, provinces)
         root.addView(filter)
+        val cityFilter = Spinner(this)
+        root.addView(cityFilter)
+        fun refreshCities() {
+            val province = provinces[filter.selectedItemPosition]
+            val cities = listOf("시·군·구 전체") + destinations
+                .filter { province == "전국 전체" || it.province == province }
+                .map { it.city }.distinct().sorted()
+            cityFilter.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, cities)
+        }
+        filter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                refreshCities()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        refreshCities()
         val noRepeat = CheckBox(this).apply {
             text = "중복 없이 뽑기 (모든 후보를 뽑으면 초기화)"
             isChecked = true
@@ -141,7 +158,11 @@ class MainActivity : Activity() {
         draw.setOnClickListener {
             if (rolling) return@setOnClickListener
             val chosenProvince = provinces[filter.selectedItemPosition]
-            val allCandidates = destinations.filter { chosenProvince == "전국 전체" || it.province == chosenProvince }
+            val chosenCity = cityFilter.selectedItem?.toString() ?: "시·군·구 전체"
+            val allCandidates = destinations.filter {
+                (chosenProvince == "전국 전체" || it.province == chosenProvince) &&
+                (chosenCity == "시·군·구 전체" || it.city == chosenCity)
+            }
             var candidates = if (noRepeat.isChecked) allCandidates.filter { (it.province + "/" + it.city) !in visited } else allCandidates
             if (candidates.isEmpty() && allCandidates.isNotEmpty() && noRepeat.isChecked) {
                 allCandidates.forEach { visited.remove(it.province + "/" + it.city) }
@@ -154,6 +175,8 @@ class MainActivity : Activity() {
                 return@setOnClickListener
             }
             rolling = true
+            filter.isEnabled = false
+            cityFilter.isEnabled = false
             draw.isEnabled = false
             external.isEnabled = false
             var tick = 0
@@ -172,6 +195,8 @@ class MainActivity : Activity() {
                         saveHistory()
                         historyLabel.text = "최근 추첨: " + history.joinToString(" · ")
                         rolling = false
+                        filter.isEnabled = true
+                        cityFilter.isEnabled = true
                         draw.isEnabled = true
                         external.isEnabled = true
                         showMap(map, place.lat, place.lon, 11, place.province + " " + place.city)
