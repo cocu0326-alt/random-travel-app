@@ -34,6 +34,22 @@ jobs:
         run: |
           mkdir -p app/src/main/assets
           cp "app/src/main/java/%EC%A0%84%EA%B5%AD_%EC%A7%80%EB%A6%AC-01.jpg" app/src/main/assets/korea-map.jpg
+      - name: Bundle offline administrative boundaries and map renderer
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fL --retry 3 https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/ctprvn.geojson -o /tmp/provinces.geojson
+          curl -fL --retry 3 https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson -o /tmp/districts.geojson
+          curl -fL --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.js -o app/src/main/assets/leaflet.js
+          curl -fL --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.css -o app/src/main/assets/leaflet.css
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          out=Path('app/src/main/assets')
+          for source,target,var in [('/tmp/provinces.geojson','provinces.js','provinceData'),('/tmp/districts.geojson','districts.js','districtData')]:
+              data=json.loads(Path(source).read_text(encoding='utf-8'))
+              (out/target).write_text('window.'+var+'='+json.dumps(data,ensure_ascii=False,separators=(',',':'))+';',encoding='utf-8')
+              print(target,len(data['features']))
+          PY
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Verify generated APK
