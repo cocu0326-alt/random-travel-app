@@ -587,15 +587,15 @@ class MainActivity : Activity() {
         result.setPadding(0, 2, 0, 2)
         noRepeat.textSize = 12f
         root.addView(heading)
-        root.addView(map, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(map, LinearLayout.LayoutParams(-1, (resources.displayMetrics.density * 185).toInt(), 1f))
         root.addView(provinceLabel)
         root.addView(provinceResult)
         root.addView(provinceDraw)
         root.addView(cityLabel)
         root.addView(result)
         root.addView(draw)
-        root.addView(noRepeat)
-        root.addView(external)
+        travelPage.addView(noRepeat)
+        travelPage.addView(external)
         root.addView(travelNav)
         // The history/reset controls remain available on the travel page.
         travelPage.addView(historyLabel)
@@ -751,7 +751,7 @@ class MainActivity : Activity() {
                 box-shadow:0 2px 8px #7893a044}
             </style></head><body>
             <div id="map">
-              <img src="https://raw.githubusercontent.com/cocu0326-alt/random-travel-app/main/app/src/main/java/%EC%A0%84%EA%B5%AD_%EC%A7%80%EB%A6%AC-01.jpg" alt="전국 시·도 지도">
+              <img src="file:///android_asset/korea-map.jpg" alt="전국 시·도 지도">
               <div id="status">🎲 시·도 룰렛을 돌려보세요</div>
             </div>
             <script>
@@ -761,7 +761,7 @@ class MainActivity : Activity() {
               };
             </script></body></html>
         """.trimIndent()
-        webView.loadDataWithBaseURL("https://raw.githubusercontent.com/", html, "text/html", "UTF-8", null)
+        webView.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
     }
 
     private fun showMap(webView: WebView, lat: Double, lon: Double, zoom: Int, title: String) {
