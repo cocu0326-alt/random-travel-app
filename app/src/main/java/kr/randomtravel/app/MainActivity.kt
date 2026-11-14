@@ -8,6 +8,10 @@ import android.content.Intent
 import android.content.Context
 import android.net.Uri
 import android.graphics.Color
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
+import android.text.style.ForegroundColorSpan
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -298,14 +302,23 @@ class MainActivity : Activity() {
         preferences.getString("visited", "")?.split("|")?.filter { it.isNotBlank() }?.let { visited.addAll(it) }
         preferences.getString("recent", "")?.split("|")?.filter { it.isNotBlank() }?.let { history.addAll(it.take(5)) }
         selected = destinations.firstOrNull { it.province + "/" + it.city == preferences.getString("selected", "") }
-        val background = Color.rgb(245, 249, 253)
+        val background = Color.rgb(235, 243, 245)
+        window.statusBarColor = Color.rgb(220, 234, 238)
+        window.navigationBarColor = background
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
+            View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(background)
             setPadding(22, 24, 22, 20)
         }
         val heading = TextView(this).apply {
-            text = "🎲 랜덤여행지"
+            val title = SpannableString("🎲 랜덤여행지  by서우아빠")
+            val byStart = title.indexOf("by서우아빠")
+            title.setSpan(RelativeSizeSpan(0.48f), byStart, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            title.setSpan(ForegroundColorSpan(Color.rgb(91, 115, 124)), byStart, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            text = title
             textSize = 29f
             setTextColor(Color.rgb(26, 51, 77))
             gravity = Gravity.CENTER
@@ -402,6 +415,7 @@ class MainActivity : Activity() {
         }
         root.addView(external)
         val scroll = ScrollView(this).apply {
+            setBackgroundColor(background)
             isFillViewport = true
             addView(root)
         }
