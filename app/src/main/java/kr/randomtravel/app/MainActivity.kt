@@ -3,6 +3,7 @@ package kr.randomtravel.app
 import android.app.Activity
 import android.os.Bundle
 import android.content.Intent
+import android.content.Context
 import android.net.Uri
 import android.graphics.Color
 import android.os.Handler
@@ -47,9 +48,18 @@ class MainActivity : Activity() {
     private var rolling = false
     private val visited = mutableSetOf<String>()
     private val history = mutableListOf<String>()
+    private fun saveHistory() {
+        getSharedPreferences("travel_history", Context.MODE_PRIVATE).edit()
+            .putString("visited", visited.joinToString("|"))
+            .putString("recent", history.joinToString("|"))
+            .apply()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val preferences = getSharedPreferences("travel_history", Context.MODE_PRIVATE)
+        preferences.getString("visited", "")?.split("|")?.filter { it.isNotBlank() }?.let { visited.addAll(it) }
+        preferences.getString("recent", "")?.split("|")?.filter { it.isNotBlank() }?.let { history.addAll(it.take(5)) }
         val background = Color.rgb(245, 249, 253)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -90,7 +100,7 @@ class MainActivity : Activity() {
         val draw = Button(this).apply { text = "🎯 여행지 룰렛 돌리기" }
         root.addView(draw)
         val historyLabel = TextView(this).apply {
-            text = "최근 추첨: 없음"
+            text = if (history.isEmpty()) "최근 추첨: 없음" else "최근 추첨: " + history.joinToString(" · ")
             textSize = 13f
             setPadding(0, 10, 0, 10)
         }
@@ -101,6 +111,7 @@ class MainActivity : Activity() {
                 if (!rolling) {
                     visited.clear()
                     history.clear()
+                    saveHistory()
                     historyLabel.text = "최근 추첨: 없음"
                     Toast.makeText(this@MainActivity, "추첨 기록을 초기화했습니다", Toast.LENGTH_SHORT).show()
                 }
@@ -135,6 +146,7 @@ class MainActivity : Activity() {
             if (candidates.isEmpty() && allCandidates.isNotEmpty() && noRepeat.isChecked) {
                 allCandidates.forEach { visited.remove(it.province + "/" + it.city) }
                 candidates = allCandidates
+                saveHistory()
                 Toast.makeText(this, "해당 지역 후보를 모두 뽑아 기록을 새로 시작합니다", Toast.LENGTH_SHORT).show()
             }
             if (candidates.isEmpty()) {
@@ -157,6 +169,7 @@ class MainActivity : Activity() {
                         visited.add(place.province + "/" + place.city)
                         history.add(0, place.province + " " + place.city)
                         while (history.size > 5) history.removeAt(history.lastIndex)
+                        saveHistory()
                         historyLabel.text = "최근 추첨: " + history.joinToString(" · ")
                         rolling = false
                         draw.isEnabled = true
