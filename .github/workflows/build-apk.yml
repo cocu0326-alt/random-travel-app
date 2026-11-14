@@ -33,7 +33,7 @@ jobs:
       - name: Bundle offline Korea map
         run: |
           mkdir -p app/src/main/assets
-          cp "app/src/main/java/전국_지리-01.jpg" app/src/main/assets/korea-map.jpg
+          cp "app/src/main/java/%EC%A0%84%EA%B5%AD_%EC%A7%80%EB%A6%AC-01.jpg" app/src/main/assets/korea-map.jpg
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Verify generated APK
