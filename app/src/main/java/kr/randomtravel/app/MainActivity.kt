@@ -454,6 +454,33 @@ class MainActivity : Activity() {
             }
         }
         root.addView(travelLog)
+        val travelMapButton = Button(this).apply {
+            text = "🗺️ 금색 별 여행 지도 보기"
+            setOnClickListener {
+                if (travelCounts.values.none { it > 0 }) {
+                    Toast.makeText(this@MainActivity, "아직 방문 기록이 없습니다", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val visitMap = WebView(this@MainActivity).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    webViewClient = WebViewClient()
+                }
+                val height = (resources.displayMetrics.heightPixels * 0.62).toInt()
+                val wrapper = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(12, 8, 12, 8)
+                    addView(visitMap, LinearLayout.LayoutParams(-1, height))
+                }
+                showTravelStarsMap(visitMap)
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("★ 나의 여행 지도")
+                    .setView(wrapper)
+                    .setPositiveButton("닫기", null)
+                    .show()
+            }
+        }
+        root.addView(travelMapButton)
         val draw = Button(this).apply {
             text = "🎯 시·군·구 룰렛 돌리기"
             isEnabled = chosenProvince != null
@@ -596,6 +623,40 @@ class MainActivity : Activity() {
             }
             handler.post(runner)
         }
+    }
+
+    private fun showTravelStarsMap(webView: WebView) {
+        val points = destinations.mapNotNull { place ->
+            val count = travelCounts[destinationKey(place)] ?: 0
+            if (count <= 0) null else {
+                val safeName = (place.province + " " + place.city)
+                    .replace("\\", "\\\\").replace("'", "\\'").replace("<", "").replace(">", "")
+                "[$" + "{place.lat},$" + "{place.lon},'$" + "{safeName}',$" + "{count}]"
+            }
+        }.joinToString(",")
+        val html = """
+            <!doctype html><html lang="ko"><head>
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+            <style>html,body,#map{margin:0;width:100%;height:100%;background:#e8eef3}
+            .gold-star{color:#d4a017;font-size:29px;line-height:31px;text-shadow:0 1px 3px #654b10}
+            </style></head><body><div id="map"></div>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script>
+            var map=L.map('map').setView([36.4,127.8],7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              {attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(map);
+            var points=[$points],bounds=[];
+            points.forEach(function(p){
+              var icon=L.divIcon({className:'',html:'<div class="gold-star">★</div>',iconSize:[32,32],iconAnchor:[16,16]});
+              L.marker([p[0],p[1]],{icon:icon}).addTo(map)
+                .bindPopup('<b>'+p[2]+'</b><div>★ '+p[3]+'회 방문</div>');
+              bounds.push([p[0],p[1]]);
+            });
+            if(bounds.length)map.fitBounds(bounds,{padding:[35,35],maxZoom:10});
+            </script></body></html>
+        """.trimIndent()
+        webView.loadDataWithBaseURL("https://unpkg.com/", html, "text/html", "UTF-8", null)
     }
 
     private fun showProvinceRouletteMap(webView: WebView, sequence: List<String>) {
