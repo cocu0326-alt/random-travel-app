@@ -394,6 +394,19 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, 10)
         }
         root.addView(stars)
+        val travelSummary = TextView(this).apply {
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, 4, 0, 8)
+            setTextColor(Color.rgb(92, 109, 116))
+        }
+        fun refreshTravelSummary() {
+            val recorded = travelCounts.filterValues { it > 0 }
+            travelSummary.text = "나의 여행 기록 · 방문 지역 " + recorded.size +
+                "곳 / 총 여행 " + recorded.values.sum() + "회"
+        }
+        refreshTravelSummary()
+        root.addView(travelSummary)
         val confirmVisit = Button(this).apply {
             text = "★ 여행 다녀왔어요 (+1)"
             isEnabled = selected != null
@@ -416,19 +429,6 @@ class MainActivity : Activity() {
             }
         }
         root.addView(confirmVisit)
-        val travelSummary = TextView(this).apply {
-            textSize = 14f
-            gravity = Gravity.CENTER
-            setPadding(0, 4, 0, 8)
-            setTextColor(Color.rgb(92, 109, 116))
-        }
-        fun refreshTravelSummary() {
-            val recorded = travelCounts.filterValues { it > 0 }
-            travelSummary.text = "나의 여행 기록 · 방문 지역 " + recorded.size +
-                "곳 / 총 여행 " + recorded.values.sum() + "회"
-        }
-        refreshTravelSummary()
-        root.addView(travelSummary)
         val travelLog = Button(this).apply {
             text = "★ 나의 여행 기록 보기"
             setOnClickListener {
