@@ -648,7 +648,7 @@ class MainActivity : Activity() {
                         provinceDraw.isEnabled = true
                         draw.isEnabled = true
                         result.text = "이제 " + province + "의 시·군·구를 뽑아주세요"
-                        map.evaluateJavascript("window.beginCityStage && window.beginCityStage('" + province + "');", null)
+                        showDistrictRouletteMap(map, province)
                     }
                 }
             }
@@ -677,7 +677,7 @@ class MainActivity : Activity() {
                 override fun run() {
                     val place = candidates.random()
                     result.text = place.province + "\n" + place.city
-                    map.evaluateJavascript("window.highlightCity && window.highlightCity(" + place.lat + "," + place.lon + ",\u0027" + place.city + "\u0027," + (tick == 17) + ");", null)
+                    map.evaluateJavascript("window.highlightDistrict && window.highlightDistrict(\u0027" + place.province + " " + place.city + "\u0027," + place.lat + "," + place.lon + "," + (tick == 17) + ");", null)
                     tick++
                     if (tick < 18) {
                         handler.postDelayed(this, (65 + tick * 12).toLong())
@@ -734,6 +734,77 @@ class MainActivity : Activity() {
             </script></body></html>
         """.trimIndent()
         webView.loadDataWithBaseURL("https://unpkg.com/", html, "text/html", "UTF-8", null)
+    }
+
+    private fun showDistrictRouletteMap(webView: WebView, province: String) {
+        val candidates = destinations.filter { it.province == province }
+        val lat = candidates.map { it.lat }.average()
+        val lon = candidates.map { it.lon }.average()
+        val safeProvince = province.replace("'", "")
+        val html = """
+            <!doctype html><html lang="ko"><head>
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+            <style>
+              html,body,#map{margin:0;width:100%;height:100%;background:#e8f0f4}
+              #status{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+                z-index:1000;background:#fffdeb;border-radius:16px;padding:7px 12px;
+                font:600 13px sans-serif;white-space:nowrap;color:#214b61;max-width:94%;
+                overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 7px #6788}
+            </style></head><body>
+            <div id="map"></div><div id="status">$safeProvince 시·군·구 지도 불러오는 중...</div>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script>
+              var map=L.map('map',{zoomControl:false}).setView([$lat,$lon],9);
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                {attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
+              var features=[],active=null,pin=null,queued=null,province='$safeProvince';
+              var status=document.getElementById('status');
+              function normalize(s){return (s||'').replace('전라북도','전북특별자치도')
+                .replace('강원도','강원특별자치도').replace(/\\s+/g,'').trim();}
+              function pick(name,lat,lon,final){
+                if(active){map.removeLayer(active);active=null;}
+                if(pin){map.removeLayer(pin);pin=null;}
+                var found=features.filter(function(f){
+                  var p=f.properties||{},n=normalize(p.FULL_NM||p.full_nm||'');
+                  return n===normalize(name);
+                });
+                if(found.length){
+                  active=L.geoJSON({type:'FeatureCollection',features:found},
+                    {style:{color:'#f6a400',weight:4,fillColor:'#ffcb3e',fillOpacity:.68}}).addTo(map);
+                  map.panTo(active.getBounds().getCenter(),{animate:false});
+                }else{
+                  pin=L.circleMarker([lat,lon],{radius:11,color:'#e99500',weight:3,
+                    fillColor:'#ffdb56',fillOpacity:.85}).addTo(map);
+                  map.panTo([lat,lon],{animate:false});
+                }
+                status.textContent=(final?'🎉 선택: ':'🎲 추첨 중: ')+name;
+                status.style.background=final?'#d6f4df':'#fff0a4';
+                status.style.opacity=final?'1':'.8';
+              }
+              window.highlightDistrict=function(name,lat,lon,final){
+                queued=[name,lat,lon,final];
+                pick(name,lat,lon,final);
+              };
+              fetch('https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson')
+                .then(function(r){if(!r.ok)throw Error('geojson');return r.json();})
+                .then(function(data){
+                  features=(data.features||[]).filter(function(f){
+                    var n=normalize((f.properties||{}).FULL_NM||'');
+                    return n.startsWith(normalize(province));
+                  });
+                  if(features.length){
+                    var boundaries=L.geoJSON({type:'FeatureCollection',features:features},
+                      {style:{color:'#688da4',weight:1.2,fillColor:'#b4dce9',fillOpacity:.2}})
+                      .addTo(map);
+                    map.fitBounds(boundaries.getBounds(),{padding:[14,14]});
+                    status.textContent=province+' · 시·군·구 경계 지도';
+                  }else{status.textContent=province+' · 위치 기반 지도';}
+                  if(queued)pick.apply(null,queued);
+                }).catch(function(){status.textContent=province+' · 지도 표시 (경계 연결 불가)';});
+            </script></body></html>
+        """.trimIndent()
+        webView.loadDataWithBaseURL("https://unpkg.com/",html,"text/html","UTF-8",null)
     }
 
     private fun showProvinceRouletteMap(webView: WebView, sequence: List<String>) {
