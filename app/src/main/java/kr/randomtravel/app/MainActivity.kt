@@ -220,7 +220,23 @@ class MainActivity : Activity() {
             var map=L.map('map').setView([$lat,$lon],$zoom);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
             {attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(map);
-            L.marker([$lat,$lon]).addTo(map).bindPopup('$safeTitle').openPopup();
+            var marker=L.marker([$lat,$lon]).addTo(map).bindPopup('$safeTitle').openPopup();
+            if ('$safeTitle' !== '대한민국') {
+                fetch('https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson')
+                  .then(function(response) { if (!response.ok) throw new Error('boundary unavailable'); return response.json(); })
+                  .then(function(data) {
+                    var matches=data.features.filter(function(feature) {
+                        var p=feature.properties || {};
+                        return p.FULL_NM === '$safeTitle' ||
+                          (p.FULL_NM && p.FULL_NM.replace(/특별자치도/g,'도').replace(/특별자치시/g,'시') === '$safeTitle'.replace(/특별자치도/g,'도').replace(/특별자치시/g,'시'));
+                    });
+                    if(matches.length) {
+                        var layer=L.geoJSON({type:'FeatureCollection',features:matches},
+                            {style:{color:'#0b79ba',weight:3,fillColor:'#42b8f4',fillOpacity:0.25}}).addTo(map);
+                        map.fitBounds(layer.getBounds(),{padding:[18,18]});
+                    }
+                  }).catch(function(error) { console.warn('Boundary unavailable',error); });
+            }
             </script></body></html>
         """.trimIndent()
         webView.loadDataWithBaseURL("https://unpkg.com/", html, "text/html", "UTF-8", null)
