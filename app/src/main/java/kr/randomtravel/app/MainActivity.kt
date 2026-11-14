@@ -12,6 +12,7 @@ import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
+import android.widget.CheckBox
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -44,6 +45,8 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private var selected: Destination? = null
     private var rolling = false
+    private val visited = mutableSetOf<String>()
+    private val history = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +74,11 @@ class MainActivity : Activity() {
         val filter = Spinner(this)
         filter.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, provinces)
         root.addView(filter)
+        val noRepeat = CheckBox(this).apply {
+            text = "중복 없이 뽑기 (모든 후보를 뽑으면 초기화)"
+            isChecked = true
+        }
+        root.addView(noRepeat)
         val result = TextView(this).apply {
             text = "여행지를 뽑아보세요!"
             textSize = 25f
@@ -81,6 +89,24 @@ class MainActivity : Activity() {
         root.addView(result)
         val draw = Button(this).apply { text = "🎯 여행지 룰렛 돌리기" }
         root.addView(draw)
+        val historyLabel = TextView(this).apply {
+            text = "최근 추첨: 없음"
+            textSize = 13f
+            setPadding(0, 10, 0, 10)
+        }
+        root.addView(historyLabel)
+        val reset = Button(this).apply {
+            text = "추첨 기록 초기화"
+            setOnClickListener {
+                if (!rolling) {
+                    visited.clear()
+                    history.clear()
+                    historyLabel.text = "최근 추첨: 없음"
+                    Toast.makeText(this@MainActivity, "추첨 기록을 초기화했습니다", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        root.addView(reset)
         val map = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -104,7 +130,13 @@ class MainActivity : Activity() {
         draw.setOnClickListener {
             if (rolling) return@setOnClickListener
             val chosenProvince = provinces[filter.selectedItemPosition]
-            val candidates = destinations.filter { chosenProvince == "전국 전체" || it.province == chosenProvince }
+            val allCandidates = destinations.filter { chosenProvince == "전국 전체" || it.province == chosenProvince }
+            var candidates = if (noRepeat.isChecked) allCandidates.filter { (it.province + "/" + it.city) !in visited } else allCandidates
+            if (candidates.isEmpty() && allCandidates.isNotEmpty() && noRepeat.isChecked) {
+                allCandidates.forEach { visited.remove(it.province + "/" + it.city) }
+                candidates = allCandidates
+                Toast.makeText(this, "해당 지역 후보를 모두 뽑아 기록을 새로 시작합니다", Toast.LENGTH_SHORT).show()
+            }
             if (candidates.isEmpty()) {
                 Toast.makeText(this, "선택 가능한 여행지가 없습니다", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -122,6 +154,10 @@ class MainActivity : Activity() {
                         handler.postDelayed(this, (65 + tick * 12).toLong())
                     } else {
                         selected = place
+                        visited.add(place.province + "/" + place.city)
+                        history.add(0, place.province + " " + place.city)
+                        while (history.size > 5) history.removeAt(history.lastIndex)
+                        historyLabel.text = "최근 추첨: " + history.joinToString(" · ")
                         rolling = false
                         draw.isEnabled = true
                         external.isEnabled = true
