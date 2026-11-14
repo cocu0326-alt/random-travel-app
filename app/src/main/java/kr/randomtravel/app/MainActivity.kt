@@ -409,12 +409,51 @@ class MainActivity : Activity() {
                         travelCounts[key] = (travelCounts[key] ?: 0) + 1
                         saveHistory()
                         stars.text = starLabel(selected)
+                        refreshTravelSummary()
                         Toast.makeText(this@MainActivity, "여행 완료! 금색 별이 추가되었습니다", Toast.LENGTH_SHORT).show()
                     }
                     .show()
             }
         }
         root.addView(confirmVisit)
+        val travelSummary = TextView(this).apply {
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, 4, 0, 8)
+            setTextColor(Color.rgb(92, 109, 116))
+        }
+        fun refreshTravelSummary() {
+            val recorded = travelCounts.filterValues { it > 0 }
+            travelSummary.text = "나의 여행 기록 · 방문 지역 " + recorded.size +
+                "곳 / 총 여행 " + recorded.values.sum() + "회"
+        }
+        refreshTravelSummary()
+        root.addView(travelSummary)
+        val travelLog = Button(this).apply {
+            text = "★ 나의 여행 기록 보기"
+            setOnClickListener {
+                val records = destinations.mapNotNull { place ->
+                    val count = travelCounts[destinationKey(place)] ?: 0
+                    if (count > 0) place to count else null
+                }.sortedWith(compareByDescending<Pair<Destination, Int>> { it.second }
+                    .thenBy { it.first.province }.thenBy { it.first.city })
+                val content = if (records.isEmpty()) {
+                    "아직 완료한 여행이 없습니다. 여행을 다녀온 뒤 금색 별을 추가해 보세요."
+                } else {
+                    "방문 지역 " + records.size + "곳 · 총 " +
+                        records.sumOf { it.second } + "회 여행\\n\\n" +
+                        records.joinToString("\\n\\n") { (place, count) ->
+                            "★ " + count + "  " + place.province + " " + place.city
+                        }
+                }
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("★ 나의 여행 기록")
+                    .setMessage(content)
+                    .setPositiveButton("닫기", null)
+                    .show()
+            }
+        }
+        root.addView(travelLog)
         val draw = Button(this).apply {
             text = "🎯 시·군·구 룰렛 돌리기"
             isEnabled = chosenProvince != null
