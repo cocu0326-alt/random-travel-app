@@ -737,143 +737,125 @@ class MainActivity : Activity() {
     }
 
     private fun showDistrictRouletteMap(webView: WebView, province: String) {
-        val candidates = destinations.filter { it.province == province }
-        val lat = candidates.map { it.lat }.average()
-        val lon = candidates.map { it.lon }.average()
         val safeProvince = province.replace("'", "")
         val html = """
             <!doctype html><html lang="ko"><head>
             <meta name="viewport" content="width=device-width,initial-scale=1">
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+            <link rel="stylesheet" href="file:///android_asset/leaflet.css">
             <style>
-              html,body,#map{margin:0;width:100%;height:100%;background:#e8f0f4}
-              #status{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
-                z-index:1000;background:#fffdeb;border-radius:16px;padding:7px 12px;
-                font:600 13px sans-serif;white-space:nowrap;color:#214b61;max-width:94%;
-                overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 7px #6788}
-            </style></head><body>
-            <div id="map"></div><div id="status">$safeProvince 시·군·구 지도 불러오는 중...</div>
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+              html,body,#map{height:100%;width:100%;margin:0;background:#f7fafc}
+              .leaflet-container{background:#f7fafc}
+              .region-label{font:600 11px sans-serif;color:#234358;text-align:center;
+                text-shadow:-1px -1px white,1px -1px white,-1px 1px white,1px 1px white}
+              #status{position:absolute;z-index:1000;left:50%;bottom:7px;transform:translateX(-50%);
+                max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                background:#fff8df;border:1px solid #d7bd72;border-radius:17px;
+                padding:7px 13px;color:#214a60;font:600 13px sans-serif}
+            </style></head><body><div id="map"></div>
+            <div id="status">$safeProvince · 시·군·구 룰렛</div>
+            <script src="file:///android_asset/leaflet.js"></script>
+            <script src="file:///android_asset/districts.js"></script>
             <script>
-              var map=L.map('map',{zoomControl:false}).setView([$lat,$lon],9);
-              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                {attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
-              var features=[],active=null,pin=null,queued=null,province='$safeProvince';
-              var status=document.getElementById('status');
-              function normalize(s){return (s||'').replace('전라북도','전북특별자치도')
+              var map=L.map('map',{zoomControl:false,attributionControl:false,dragging:false,
+                scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,touchZoom:false});
+              var province='$safeProvince', layers={},active=null;
+              var colors=['#c7e4fa','#f4cbe4','#fff0a0','#d8edb9','#c9ebeb','#e1d9f7'];
+              function norm(s){return (s||'').replace('전라북도','전북특별자치도')
                 .replace('강원도','강원특별자치도').replace(/\\s+/g,'').trim();}
-              function pick(name,lat,lon,final){
-                if(active){map.removeLayer(active);active=null;}
-                if(pin){map.removeLayer(pin);pin=null;}
-                var found=features.filter(function(f){
-                  var p=f.properties||{},n=normalize(p.FULL_NM||p.full_nm||'');
-                  return n===normalize(name);
-                });
-                if(found.length){
-                  active=L.geoJSON({type:'FeatureCollection',features:found},
-                    {style:{color:'#f6a400',weight:4,fillColor:'#ffcb3e',fillOpacity:.68}}).addTo(map);
-                  map.panTo(active.getBounds().getCenter(),{animate:false});
-                }else{
-                  pin=L.circleMarker([lat,lon],{radius:11,color:'#e99500',weight:3,
-                    fillColor:'#ffdb56',fillOpacity:.85}).addTo(map);
-                  map.panTo([lat,lon],{animate:false});
+              var features=(window.districtData.features||[]).filter(function(f){
+                return norm((f.properties||{}).SIDO_NM)===norm(province);
+              });
+              var all=L.geoJSON({type:'FeatureCollection',features:features},{
+                style:function(f){return {color:'#607d8b',weight:1.3,fillColor:'#c8e5f4',fillOpacity:.7}},
+                onEachFeature:function(f,layer){
+                  var name=norm((f.properties||{}).FULL_NM);
+                  layers[name]=layer;
                 }
-                status.textContent=(final?'🎉 선택: ':'🎲 추첨 중: ')+name;
-                status.style.background=final?'#d6f4df':'#fff0a4';
-                status.style.opacity=final?'1':'.8';
-              }
+              }).addTo(map);
+              if(features.length)map.fitBounds(all.getBounds(),{padding:[17,28]});
+              else map.setView([36,127.7],7);
+              features.forEach(function(f){
+                var name=(f.properties||{}).SIG_KOR_NM||'';
+                var layer=layers[norm((f.properties||{}).FULL_NM)];
+                if(!layer)return;
+                var center=layer.getBounds().getCenter();
+                L.marker(center,{interactive:false,icon:L.divIcon({className:'region-label',
+                  html:name,iconSize:[66,16],iconAnchor:[33,8]})}).addTo(map);
+              });
               window.highlightDistrict=function(name,lat,lon,final){
-                queued=[name,lat,lon,final];
-                pick(name,lat,lon,final);
+                if(active)active.setStyle({color:'#607d8b',weight:1.3,fillColor:'#c8e5f4',fillOpacity:.7});
+                active=layers[norm(name)]||null;
+                if(active){
+                  active.setStyle({color:'#ed8b00',weight:3.4,fillColor:'#ffcc42',fillOpacity:.95});
+                  active.bringToFront();
+                }
+                var status=document.getElementById('status');
+                status.textContent=(final?'🎉 당첨: ':'🎲 추첨 중: ')+name;
+                status.style.background=final?'#d8f5d8':'#fff0a0';
               };
-              fetch('https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson')
-                .then(function(r){if(!r.ok)throw Error('geojson');return r.json();})
-                .then(function(data){
-                  features=(data.features||[]).filter(function(f){
-                    var n=normalize((f.properties||{}).FULL_NM||'');
-                    return n.startsWith(normalize(province));
-                  });
-                  if(features.length){
-                    var boundaries=L.geoJSON({type:'FeatureCollection',features:features},
-                      {style:{color:'#688da4',weight:1.2,fillColor:'#b4dce9',fillOpacity:.2}})
-                      .addTo(map);
-                    map.fitBounds(boundaries.getBounds(),{padding:[14,14]});
-                    status.textContent=province+' · 시·군·구 경계 지도';
-                  }else{status.textContent=province+' · 위치 기반 지도';}
-                  if(queued)pick.apply(null,queued);
-                }).catch(function(){status.textContent=province+' · 지도 표시 (경계 연결 불가)';});
             </script></body></html>
         """.trimIndent()
-        webView.loadDataWithBaseURL("https://unpkg.com/",html,"text/html","UTF-8",null)
+        webView.loadDataWithBaseURL("file:///android_asset/",html,"text/html","UTF-8",null)
     }
 
     private fun showProvinceRouletteMap(webView: WebView, sequence: List<String>) {
         val html = """
             <!doctype html><html lang="ko"><head>
             <meta name="viewport" content="width=device-width,initial-scale=1">
+            <link rel="stylesheet" href="file:///android_asset/leaflet.css">
             <style>
-              html,body{margin:0;width:100%;height:100%;background:#eef3f5;overflow:hidden}
-              #map{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-              #art{position:absolute;inset:0;transform-origin:center;transition:transform .6s ease}
-              img{width:100%;height:100%;object-fit:contain}
-              #marker{position:absolute;display:none;transform:translate(-50%,-100%);font-size:29px;
-                filter:drop-shadow(0 2px 4px #183e63);z-index:2;pointer-events:none}
-              #marker.flash{animation:blink .32s ease-in-out infinite alternate}
-              @keyframes blink{from{opacity:.22;transform:translate(-50%,-100%) scale(.72)}
-                to{opacity:1;transform:translate(-50%,-100%) scale(1.25)}}
-              #status{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
+              html,body,#map{height:100%;width:100%;margin:0;background:#f7fafc}
+              .leaflet-container{background:#f7fafc}
+              .region-label{font:700 11px sans-serif;color:#263d52;text-align:center;
+                text-shadow:-1px -1px white,1px -1px white,-1px 1px white,1px 1px white}
+              #status{position:absolute;z-index:1000;left:50%;bottom:7px;transform:translateX(-50%);
                 max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                background:rgba(255,255,255,.95);color:#264c60;border:1px solid #a9c6cf;
-                border-radius:18px;padding:7px 14px;font:600 15px sans-serif;
-                box-shadow:0 2px 8px #7893a044;z-index:3}
-              #status.flash{background:#ffed92;border-color:#f3a900}
-            </style></head><body>
-            <div id="map">
-              <div id="art"><img src="file:///android_asset/korea-map.jpg" alt="전국 시·도 지도">
-              <div id="marker">📍</div></div>
-              <div id="status">🎲 시·도 룰렛을 돌려보세요</div>
-            </div>
+                background:#fff8df;border:1px solid #d7bd72;border-radius:17px;
+                padding:7px 13px;color:#214a60;font:600 13px sans-serif}
+            </style></head><body><div id="map"></div>
+            <div id="status">🎲 시·도 룰렛을 돌려보세요</div>
+            <script src="file:///android_asset/leaflet.js"></script>
+            <script src="file:///android_asset/provinces.js"></script>
             <script>
-              // Approximate visual positions on the illustration, not administrative boundaries.
-              const provincePositions={
-                '서울특별시':[49,30],'인천광역시':[39,33],'경기도':[49,37],
-                '강원특별자치도':[68,29],'강원도':[68,29],
-                '충청북도':[59,48],'충청남도':[43,52],'대전광역시':[53,55],
-                '세종특별자치시':[52,48],'전북특별자치도':[49,67],'전라북도':[49,67],
-                '광주광역시':[43,78],'전라남도':[44,82],
-                '경상북도':[73,57],'대구광역시':[70,69],
-                '울산광역시':[83,74],'부산광역시':[80,81],
-                '경상남도':[66,78],'제주특별자치도':[34,94]
-              };
-              function locate(x,y,final){
-                const marker=document.getElementById('marker');
-                marker.style.left=x+'%';marker.style.top=y+'%';
-                marker.style.display='block';marker.className=final?'':'flash';
-                document.getElementById('status').className=final?'':'flash';
-              }
-              window.beginCityStage=function(name){
-                const p=provincePositions[name]||[50,50];
-                const z=2.0;
-                document.getElementById('art').style.transform='translate('+
-                  ((50-p[0])*z)+'%,'+((50-p[1])*z)+'%) scale('+z+')';
-                document.getElementById('status').textContent='🔎 '+name+' 확대 · 시·군·구 추첨 준비';
-                document.getElementById('marker').className='';
-              };
+              var map=L.map('map',{zoomControl:false,attributionControl:false,dragging:false,
+                scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,touchZoom:false});
+              var layers={},active=null;
+              var palette=['#c7e4fa','#f4cbe4','#fff0a0','#d8edb9','#c9ebeb',
+                '#e1d9f7','#f9e2bc','#d5d9f1','#f7d6c9'];
+              function norm(s){return (s||'').replace('전라북도','전북특별자치도')
+                .replace('강원도','강원특별자치도').replace(/\\s+/g,'').trim();}
+              var features=window.provinceData.features||[];
+              var all=L.geoJSON({type:'FeatureCollection',features:features},{
+                style:function(f){var i=features.indexOf(f);return {
+                  color:'#526d79',weight:1.5,fillColor:palette[i%palette.length],fillOpacity:.88}},
+                onEachFeature:function(f,layer){
+                  layers[norm((f.properties||{}).CTP_KOR_NM)]=layer;
+                }
+              }).addTo(map);
+              map.fitBounds(all.getBounds(),{padding:[14,18]});
+              features.forEach(function(f){
+                var name=(f.properties||{}).CTP_KOR_NM||'';
+                var layer=layers[norm(name)];if(!layer)return;
+                var center=layer.getBounds().getCenter();
+                var shortName=name.replace('특별자치도','').replace('특별자치시','')
+                  .replace('특별시','').replace('광역시','');
+                L.marker(center,{interactive:false,icon:L.divIcon({className:'region-label',
+                  html:shortName,iconSize:[55,18],iconAnchor:[27,9]})}).addTo(map);
+              });
               window.highlightProvince=function(name,final){
-                const p=provincePositions[name]||[50,50];
-                locate(p[0],p[1],final);
-                document.getElementById('status').textContent=(final?'🎉 선택된 시·도: ':'🎲 추첨 중: ')+name;
-              };
-              window.highlightCity=function(lat,lon,name,final){
-                // Representative point projected approximately onto the static artwork.
-                const x=Math.max(18,Math.min(89,38+(lon-125.7)*19));
-                const y=Math.max(14,Math.min(92,89-(lat-33.1)*15));
-                locate(x,y,final);
-                document.getElementById('status').textContent=(final?'🎉 선택: ':'🎲 시·군·구 추첨 중: ')+name;
+                if(active)active.setStyle({color:'#526d79',weight:1.5,fillOpacity:.88});
+                active=layers[norm(name)]||null;
+                if(active){
+                  active.setStyle({color:'#ec8800',weight:3.5,fillColor:'#ffcc42',fillOpacity:.98});
+                  active.bringToFront();
+                }
+                var status=document.getElementById('status');
+                status.textContent=(final?'🎉 선택된 시·도: ':'🎲 추첨 중: ')+name;
+                status.style.background=final?'#d8f5d8':'#fff0a0';
               };
             </script></body></html>
         """.trimIndent()
-        webView.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
+        webView.loadDataWithBaseURL("file:///android_asset/",html,"text/html","UTF-8",null)
     }
 
     private fun showMap(webView: WebView, lat: Double, lon: Double, zoom: Int, title: String) {
