@@ -648,7 +648,7 @@ class MainActivity : Activity() {
                         provinceDraw.isEnabled = true
                         draw.isEnabled = true
                         result.text = "이제 " + province + "의 시·군·구를 뽑아주세요"
-                        // Keep the winning province highlighted on the map.
+                        map.evaluateJavascript("window.beginCityStage && window.beginCityStage('" + province + "');", null)
                     }
                 }
             }
@@ -743,6 +743,7 @@ class MainActivity : Activity() {
             <style>
               html,body{margin:0;width:100%;height:100%;background:#eef3f5;overflow:hidden}
               #map{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+              #art{position:absolute;inset:0;transform-origin:center;transition:transform .6s ease}
               img{width:100%;height:100%;object-fit:contain}
               #marker{position:absolute;display:none;transform:translate(-50%,-100%);font-size:29px;
                 filter:drop-shadow(0 2px 4px #183e63);z-index:2;pointer-events:none}
@@ -757,8 +758,8 @@ class MainActivity : Activity() {
               #status.flash{background:#ffed92;border-color:#f3a900}
             </style></head><body>
             <div id="map">
-              <img src="file:///android_asset/korea-map.jpg" alt="전국 시·도 지도">
-              <div id="marker">📍</div>
+              <div id="art"><img src="file:///android_asset/korea-map.jpg" alt="전국 시·도 지도">
+              <div id="marker">📍</div></div>
               <div id="status">🎲 시·도 룰렛을 돌려보세요</div>
             </div>
             <script>
@@ -779,6 +780,14 @@ class MainActivity : Activity() {
                 marker.style.display='block';marker.className=final?'':'flash';
                 document.getElementById('status').className=final?'':'flash';
               }
+              window.beginCityStage=function(name){
+                const p=provincePositions[name]||[50,50];
+                const z=2.0;
+                document.getElementById('art').style.transform='translate('+
+                  ((50-p[0])*z)+'%,'+((50-p[1])*z)+'%) scale('+z+')';
+                document.getElementById('status').textContent='🔎 '+name+' 확대 · 시·군·구 추첨 준비';
+                document.getElementById('marker').className='';
+              };
               window.highlightProvince=function(name,final){
                 const p=provincePositions[name]||[50,50];
                 locate(p[0],p[1],final);
