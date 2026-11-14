@@ -326,7 +326,7 @@ class MainActivity : Activity() {
             val province = provinces[filter.selectedItemPosition]
             val cities = listOf("시·군·구 전체") + destinations
                 .filter { province == "전국 전체" || it.province == province }
-                .map { it.city }.distinct().sorted()
+                .map { if (province == "전국 전체") it.province + " " + it.city else it.city }.distinct().sorted()
             cityFilter.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, cities)
         }
         filter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -403,7 +403,7 @@ class MainActivity : Activity() {
             val chosenCity = cityFilter.selectedItem?.toString() ?: "시·군·구 전체"
             val allCandidates = destinations.filter {
                 (chosenProvince == "전국 전체" || it.province == chosenProvince) &&
-                (chosenCity == "시·군·구 전체" || it.city == chosenCity)
+                (chosenCity == "시·군·구 전체" || it.city == chosenCity || it.province + " " + it.city == chosenCity)
             }
             var candidates = if (noRepeat.isChecked) allCandidates.filter { (it.province + "/" + it.city) !in visited } else allCandidates
             if (candidates.isEmpty() && allCandidates.isNotEmpty() && noRepeat.isChecked) {
@@ -455,14 +455,17 @@ class MainActivity : Activity() {
             <!doctype html><html lang="ko"><head>
             <meta name="viewport" content="width=device-width,initial-scale=1">
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-            <style>html,body,#map{margin:0;width:100%;height:100%;background:#e8eef3}</style>
-            </head><body><div id="map"></div>
+            <style>html,body,#map{margin:0;width:100%;height:100%;background:#e8eef3}#status{position:absolute;z-index:1000;left:8px;bottom:8px;background:white;padding:5px 9px;border-radius:5px;font:12px sans-serif;color:#345;box-shadow:0 1px 4px #999}</style>
+            </head><body><div id="map"></div><div id="status">지도 불러오는 중...</div>
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
             var map=L.map('map').setView([$lat,$lon],$zoom);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
             {attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(map);
             var marker=L.marker([$lat,$lon]).addTo(map).bindPopup('$safeTitle').openPopup();
+            var status=document.getElementById('status');
+            map.whenReady(function(){status.textContent='지도를 이동하거나 확대할 수 있습니다';});
+            if ('$safeTitle' === '대한민국') status.textContent='전국 지도';
             if ('$safeTitle' !== '대한민국') {
                 fetch('https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson')
                   .then(function(response) { if (!response.ok) throw new Error('boundary unavailable'); return response.json(); })
@@ -477,8 +480,9 @@ class MainActivity : Activity() {
                         var layer=L.geoJSON({type:'FeatureCollection',features:matches},
                             {style:{color:'#0b79ba',weight:3,fillColor:'#42b8f4',fillOpacity:0.25}}).addTo(map);
                         map.fitBounds(layer.getBounds(),{padding:[18,18]});
-                    }
-                  }).catch(function(error) { console.warn('Boundary unavailable',error); });
+                        status.textContent='선택한 행정구역 경계';
+                    } else { status.textContent='경계 데이터 없음 · 위치 표시 중'; }
+                  }).catch(function(error) { status.textContent='경계 연결 실패 · 위치 표시 중'; console.warn('Boundary unavailable',error); });
             }
             </script></body></html>
         """.trimIndent()
