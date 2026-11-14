@@ -434,6 +434,7 @@ class MainActivity : Activity() {
                 override fun run() {
                     val province = sequence[tick]
                     provinceResult.text = province
+                    map.evaluateJavascript("window.highlightProvince && window.highlightProvince('" + province + "'," + (tick == 17) + ");", null)
                     tick++
                     if (tick < 18) {
                         handler.postDelayed(this, (65 + tick * 12).toLong())
@@ -510,6 +511,10 @@ class MainActivity : Activity() {
               {attribution:'© OpenStreetMap contributors',maxZoom:18}).addTo(map);
             var status=document.getElementById('status');
             var sequence=[$names];
+            window.highlightProvince=function(name,isFinal){
+              window.pendingProvince={name:name,final:isFinal};
+              status.textContent=(isFinal?'🎉 당첨: ':'🎲 추첨 중: ')+name;
+            };
             var aliases={'전라북도':'전북특별자치도'};
             fetch('https://raw.githubusercontent.com/KnellBalm/kr-admin-geojson/main/sig.geojson')
               .then(function(r){if(!r.ok)throw new Error('GeoJSON');return r.json()})
@@ -525,22 +530,19 @@ class MainActivity : Activity() {
                     {style:{color:'#667788',weight:1,fillColor:'#dce8f2',fillOpacity:0.25}})
                     .addTo(map);
                 });
-                var i=0,previous=null;
-                function advance(){
+                var previous=null;
+                window.highlightProvince=function(name,isFinal){
                   if(previous&&layers[previous])layers[previous].setStyle(
                     {color:'#667788',weight:1,fillColor:'#dce8f2',fillOpacity:0.25});
-                  var name=sequence[i];
                   if(layers[name]){
                     layers[name].setStyle({color:'#e05a22',weight:3,fillColor:'#ffb13b',fillOpacity:0.7});
                     layers[name].bringToFront();
+                    if(isFinal)map.fitBounds(layers[name].getBounds(),{padding:[16,16],maxZoom:9});
                   }
-                  status.textContent=(i===sequence.length-1?'🎉 당첨: ':'🎲 추첨 중: ')+name;
+                  status.textContent=(isFinal?'🎉 당첨: ':'🎲 추첨 중: ')+name;
                   previous=name;
-                  i++;
-                  if(i<sequence.length)setTimeout(advance,65+i*12);
-                  else if(layers[name])map.fitBounds(layers[name].getBounds(),{padding:[16,16],maxZoom:9});
-                }
-                advance();
+                };
+                if(window.pendingProvince)window.highlightProvince(window.pendingProvince.name,window.pendingProvince.final);
               }).catch(function(){status.textContent='경계 연결 실패 · 추첨은 계속됩니다';});
             </script></body></html>
         """.trimIndent()
