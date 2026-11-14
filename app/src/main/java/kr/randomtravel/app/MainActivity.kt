@@ -427,6 +427,7 @@ class MainActivity : Activity() {
             external.isEnabled = false
             chosenProvince = null
             selected = null
+            result.text = "시·도 추첨이 끝나면 2단계를 진행하세요"
             val sequence = List(18) { provinces.random() }
             showProvinceRouletteMap(map, sequence)
             var tick = 0
