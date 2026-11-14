@@ -332,6 +332,10 @@ class MainActivity : Activity() {
             setPadding(0, 12, 0, 12)
         }
         root.addView(provinceResult)
+        selected?.let {
+            chosenProvince = it.province
+            provinceResult.text = it.province
+        }
         val provinceDraw = Button(this).apply { text = "🎲 시·도 룰렛 돌리기" }
         root.addView(provinceDraw)
         val cityLabel = TextView(this).apply {
@@ -355,7 +359,7 @@ class MainActivity : Activity() {
         root.addView(result)
         val draw = Button(this).apply {
             text = "🎯 시·군·구 룰렛 돌리기"
-            isEnabled = false
+            isEnabled = chosenProvince != null
         }
         root.addView(draw)
         val historyLabel = TextView(this).apply {
@@ -465,7 +469,7 @@ class MainActivity : Activity() {
             val runner = object : Runnable {
                 override fun run() {
                     val place = candidates.random()
-                    result.text = place.province + "\\n" + place.city
+                    result.text = place.province + "\n" + place.city
                     tick++
                     if (tick < 18) {
                         handler.postDelayed(this, (65 + tick * 12).toLong())
