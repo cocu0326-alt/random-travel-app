@@ -638,17 +638,26 @@ class MainActivity : Activity() {
                 override fun run() {
                     val province = sequence[tick]
                     provinceResult.text = province
-                    map.evaluateJavascript("window.highlightProvince && window.highlightProvince('" + province + "'," + (tick == 17) + ");", null)
-                    tick++
-                    if (tick < 18) {
-                        handler.postDelayed(this, (65 + tick * 12).toLong())
-                    } else {
-                        chosenProvince = province
-                        rolling = false
-                        provinceDraw.isEnabled = true
-                        draw.isEnabled = true
-                        result.text = "이제 " + province + "의 시·군·구를 뽑아주세요"
-                        showDistrictRouletteMap(map, province)
+                    map.evaluateJavascript(
+                        "typeof window.highlightProvince === 'function' ? (window.highlightProvince(" +
+                            org.json.JSONObject.quote(province) + "," + (tick == 17) + "), true) : false"
+                    ) { response ->
+                        if (!rolling) return@evaluateJavascript
+                        if (response != "true") {
+                            handler.postDelayed(this, 60L)
+                            return@evaluateJavascript
+                        }
+                        tick++
+                        if (tick < 18) {
+                            handler.postDelayed(this, (65 + tick * 12).toLong())
+                        } else {
+                            chosenProvince = province
+                            rolling = false
+                            provinceDraw.isEnabled = true
+                            draw.isEnabled = true
+                            result.text = "이제 " + province + "의 시·군·구를 뽑아주세요"
+                            showDistrictRouletteMap(map, province)
+                        }
                     }
                 }
             }
@@ -677,24 +686,34 @@ class MainActivity : Activity() {
                 override fun run() {
                     val place = candidates.random()
                     result.text = place.province + "\n" + place.city
-                    map.evaluateJavascript("window.highlightDistrict && window.highlightDistrict(\u0027" + place.province + " " + place.city + "\u0027," + place.lat + "," + place.lon + "," + (tick == 17) + ");", null)
-                    tick++
-                    if (tick < 18) {
-                        handler.postDelayed(this, (65 + tick * 12).toLong())
-                    } else {
-                        selected = place
-                        visited.add(place.province + "/" + place.city)
-                        history.add(0, place.province + " " + place.city)
-                        while (history.size > 5) history.removeAt(history.lastIndex)
-                        saveHistory()
-                        historyLabel.text = "최근 추첨: " + history.joinToString(" · ")
-                        rolling = false
-                        provinceDraw.isEnabled = true
-                        draw.isEnabled = true
-                        external.isEnabled = true
-                        confirmVisit.isEnabled = true
-                        stars.text = starLabel(place)
-                        showMap(map, place.lat, place.lon, 11, place.province + " " + place.city)
+                    map.evaluateJavascript(
+                        "typeof window.highlightDistrict === 'function' ? (window.highlightDistrict(" +
+                            org.json.JSONObject.quote(place.province + " " + place.city) + "," +
+                            place.lat + "," + place.lon + "," + (tick == 17) + "), true) : false"
+                    ) { response ->
+                        if (!rolling) return@evaluateJavascript
+                        if (response != "true") {
+                            handler.postDelayed(this, 60L)
+                            return@evaluateJavascript
+                        }
+                        tick++
+                        if (tick < 18) {
+                            handler.postDelayed(this, (65 + tick * 12).toLong())
+                        } else {
+                            selected = place
+                            visited.add(place.province + "/" + place.city)
+                            history.add(0, place.province + " " + place.city)
+                            while (history.size > 5) history.removeAt(history.lastIndex)
+                            saveHistory()
+                            historyLabel.text = "최근 추첨: " + history.joinToString(" · ")
+                            rolling = false
+                            provinceDraw.isEnabled = true
+                            draw.isEnabled = true
+                            external.isEnabled = true
+                            confirmVisit.isEnabled = true
+                            stars.text = starLabel(place)
+                            showMap(map, place.lat, place.lon, 11, place.province + " " + place.city)
+                        }
                     }
                 }
             }
